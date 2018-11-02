@@ -11,6 +11,7 @@ from scipy import stats
 import math
 import traceback
 from statistics import mean, stdev, StatisticsError
+import chi2test as cst
 # from prettytable import PrettyTable
 
 
@@ -62,7 +63,7 @@ class CplryDataSet:
     name = "Untitled"
     data = []
     uncertaintyInT = 0.005
-    uncertaintyInV = 0.5
+    uncertaintyInV = 1.0
 
     def __init__(self, name = "Untitled"):
         self.name = name
@@ -245,8 +246,6 @@ class CplryDataSet:
             plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
             plt.xlabel("Tube diameter (mm)")
             plt.ylabel("Flow Rate (cm^3/s)")
-            print(group.listFromData("uncertaintyFlowRate"))
-            print(group.listFromData("stdErrFlowRate"))
         elif option == 42:
             group = self.groupBy("tubeDiameter")
             x_data = group.listFromData("tubeDiameterP4")
@@ -256,7 +255,45 @@ class CplryDataSet:
             plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
             plt.xlabel("[Tube diameter]^4 (mm^4)")
             plt.ylabel("Flow Rate (cm^3/s)")
+        elif option == 43:
+            group = self.groupBy("tubeDiameter")
+            x_data = list(map(math.log, group.listFromData("tubeDiameter")))
+            y_data = list(map(math.log, group.listFromData("avgFlowRate")))
+            y_error = group.listFromData("uncertaintyFlowRate")
+            lFit = np.polyfit(x_data, y_data, 1)
+            lFitP = np.poly1d(lFit)
+            xp = np.linspace(min(x_data), max(x_data), 100)
+            plt.plot(xp, lFitP(xp), '-', linewidth=1, label = r"$ln(y)$=" + str(round(lFit[0],4)) + r"$ln(x)$+" + str(round(lFit[1],4)))
+            plt.legend(loc="upper left")
+            plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
+            plt.xlabel("ln[Tube diameter]")
+            plt.ylabel("ln[Flow Rate] (cm^3/s)")
+            y_std = group.listFromData("stdFlowRate")
+            print(y_std)
+            print(len(x_data))
+            print(len(y_data))
+            print(len(y_std))
+            csq = cst.chisquare(obs=y_data, exp=lFitP(x_data), std=y_std, ddof=2)
+            print("NOTE: The chi-squared statistic for the linear fit is " + str(round(csq[0],6)) + ", with the p-value " + str(round(csq[1], 5)) +".")
+            print("Linear Fit result: " + "y=" + str(round(lFit[0],9)) + "x+" + str(round(lFit[1],9)))
         plt.show()
+
+    def subPlot(self, option):
+        length = int(len(self.data))
+        while True:
+            try:
+                subs = input("Enter the range natural indices of the data you want to plot, connected by \"-\", [From 1 to " + str(length) + "]: ")
+                subDataIndices = list(map(int, np.linspace(int(subs.split("-")[0]), int(subs.split("-")[1]), num=(abs(int(subs.split("-")[1]) - int(subs.split("-")[0]))+1))))
+                print(subDataIndices)
+                break
+            except ValueError:
+                print("Invalid input. Please try again.")
+
+        subData = [self.data[(i - 1)] for i in subDataIndices]
+        subDataSet = CplryDataSet()
+        subDataSet.data = subData
+        subDataSet.plot(option)
+
 
     def listFromData(self, option):
         dList = []
@@ -270,6 +307,8 @@ class CplryDataSet:
             dList = [gd.stdErr() for gd in self.data]
         elif option == "uncertaintyFlowRate":
             dList = [(((self.uncertaintyInV / mean(gd.flowVolumeDiffs)) + (self.uncertaintyInT / mean(gd.flowTimes))) * gd.avgFlowRate()) for gd in self.data]
+        elif option == "stdFlowRate":
+            dList = [gd.std() for gd in self.data]
         return dList
 
     def groupBy(self, option):
@@ -292,9 +331,6 @@ class CplryDataSet:
                 groupSet.data.append(pData)
 
         return groupSet
-
-
-
 
 
 def initiate():
@@ -332,17 +368,24 @@ def addOrSave():
     global passAddOrSave
     while True:
         try:
-            opt = input("Choose the following options: \n1 - Add new data\n3 - Save the data set\n41 -  Plot tube diameter vs flow rate\n42 -  Plot [tube diameter]^4 vs flow rate \n0 - Exit the program \nYour choice: ")
+            opt = input("Choose the following options: \n1 - Add new data\n3 - Save the data set\n41 -  Plot tube diameter vs flow rate\n42 -  Plot [tube diameter]^4 vs flow rate\n43 - Plot ln[tube diameter] vs ln[flow rate] w./ linear fit \n101 - Plot with a subset\n0 - Exit the program \nYour choice: ")
             if opt == "1":
                 dataSet.add()
             # elif opt == "2":
             #     set.view()
             elif opt == "3":
                 dataSet.save()
-            elif opt == "41":
-                dataSet.plot(41)
-            elif opt == "42":
-                dataSet.plot(42)
+            elif 40 <= int(opt) <= 59:
+                dataSet.plot(int(opt))
+            elif opt =="101":
+                while True:
+                    try:
+                        pltOpt = input("Please Enter your plotting option: ")
+                        pltOpt = int(pltOpt)
+                        break
+                    except ValueError:
+                        print("Invalid Value. Please try again.")
+                dataSet.subPlot(pltOpt)
             elif opt == "0":
                 while True:
                     try:
