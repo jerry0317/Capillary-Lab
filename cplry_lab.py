@@ -345,19 +345,32 @@ class CplryDataSet:
         groupSet = CplryDataSet()
         tempData = self.data
         groupSet.data = []
-        if option == "tubeDiameter":
-            paraList = [d.tubeDiameter for d in tempData]
-            paraSet = list(set(paraList))
-            for p in paraSet:
-                pData = CplrySingleGroupData()
-                pData.tubeDiameter = p
-                pData.groupBy = "tubeDiameter"
-                for d in tempData:
-                    if math.isclose(p, d.tubeDiameter):
-                        pData.flowRates.append(d.flowRate())
-                        pData.flowTimes.append(d.flowTime)
-                        pData.flowVolumeDiffs.append(d.flowVolumeDiff())
-                groupSet.data.append(pData)
+        def gParameter(dt):
+            if option == "tubeDiameter":
+                return dt.tubeDiameter
+            elif option == "tubeLength":
+                return dt.tubeLength
+            else:
+                return None
+                
+        def assignGP(a, b):
+            if option == "tubeDiameter":
+                a.tubeDiameter = b
+            elif option == "tubeLength":
+                a.tubeLength = b
+
+        paraList = [gParameter(d) for d in tempData]
+        paraSet = list(set(paraList))
+        for p in paraSet:
+            pData = CplrySingleGroupData()
+            assignGP(pData, p)
+            pData.groupBy = option
+            for d in tempData:
+                if math.isclose(p, gParameter(d)):
+                    pData.flowRates.append(d.flowRate())
+                    pData.flowTimes.append(d.flowTime)
+                    pData.flowVolumeDiffs.append(d.flowVolumeDiff())
+            groupSet.data.append(pData)
 
         return groupSet
 
