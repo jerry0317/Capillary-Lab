@@ -5,6 +5,7 @@
 
 import csv
 import os
+import fnmatch
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
@@ -29,7 +30,7 @@ class CplryData(object):
         return (self.flowVolumeAfter - self.flowVolumeBefore)
 
     def tubeRadius(self):
-        return (self.tubeLength)
+        return (self.tubeDiameter / 2)
 
     def flowPressure(self):
         return (997 * 9.8 * (self.heightDiff - (self.tubeLength * 2.54)) / 100)
@@ -43,6 +44,11 @@ class CplrySingleGroupData(CplryData):
     flowRates = []
     flowTimes = []
     flowVolumeDiffs = []
+
+    def __init__(self):
+        self.flowRates = []
+        self.flowTimes = []
+        self.flowVolumeDiffs = []
 
     def avgFlowRate(self):
         return mean(self.flowRates)
@@ -67,6 +73,7 @@ class CplryDataSet:
     uncertaintyInV = 1.0
 
     def __init__(self, name = "Untitled"):
+        self.data = []
         self.name = name
 
     def defaultFilePath(self):
@@ -220,7 +227,7 @@ class CplryDataSet:
 
     def view(self):
         table = PrettyTable()
-        table.field_names = self.defaultFileHeader()
+        table.field_names = self.defaultFileHeader() + ["Flow Rate"]
         for row in self.data:
             table.add_row([
             row.tubeLength,
@@ -229,7 +236,8 @@ class CplryDataSet:
             row.flowTime,
             round(row.flowVolumeBefore,5),
             round(row.flowVolumeAfter,5),
-            ("N/A" if str(row.notes) == "" else str(row.notes))
+            ("N/A" if str(row.notes) == "" else str(row.notes)),
+            round(row.flowRate(),5)
             ])
         print(table)
         pass
@@ -264,7 +272,7 @@ class CplryDataSet:
             y_error = group.listFromData("uncertaintyFlowRate")
             plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
 
-            y_std = group.listFromData("stdFlowRate")
+            # y_std = group.listFromData("stdFlowRate")
             xp = np.linspace(min(x_data), max(x_data), 100)
             lFitP = {}
             csq = {}
@@ -274,7 +282,7 @@ class CplryDataSet:
                 def func(x, a, b):
                     return a + b * x ** p
                 return func
-            for i in [2, 3, 4]:
+            for i in [2, 3, 4, 5]:
                 lFitP[i], _ = curve_fit(fitFunc(i), np.array(x_data), np.array(y_data))
                 plt.plot(xp, fitFunc(i)(xp, *lFitP[i]), '-', linewidth=1, label=r"$d^{0}$ fit".format(i))
                 csq = cst.chisquare(obs=y_data, exp=[fitFunc(i)(xd, *lFitP[i]) for xd in x_data], std=y_error, ddof=2)
@@ -307,7 +315,6 @@ class CplryDataSet:
             try:
                 subs = input("Enter the range natural indices of the data you want to plot, connected by \"-\", [From 1 to " + str(length) + "]: ")
                 subDataIndices = list(map(int, np.linspace(int(subs.split("-")[0]), int(subs.split("-")[1]), num=(abs(int(subs.split("-")[1]) - int(subs.split("-")[0]))+1))))
-                print(subDataIndices)
                 break
             except ValueError:
                 print("Invalid input. Please try again.")
@@ -345,7 +352,6 @@ class CplryDataSet:
                 pData = CplrySingleGroupData()
                 pData.tubeDiameter = p
                 pData.groupBy = "tubeDiameter"
-                pData.flowRates = []
                 for d in tempData:
                     if math.isclose(p, d.tubeDiameter):
                         pData.flowRates.append(d.flowRate())
@@ -370,6 +376,7 @@ def initiate():
                 raise Exception(1)
             break
         except Exception:
+            traceback.print_exc()
             print("Invalid choice. Please try again.")
         else:
             print("Unknown error. Please try again.")
@@ -378,12 +385,36 @@ def newDataSet():
     global dataSet
     nm = input("Name the new data set: ")
     dataSet = CplryDataSet(nm)
-    print("You created a new data set called " + set.name)
+    print("You created a new data set called " + dataSet.name)
 
 def openDataSet():
     global dataSet
-    nm = input("Enter the name of the existing data set: ")
-    dataSet = CplryDataSet(nm)
+    flsList = []
+    dirname = os.path.dirname(os.path.abspath(__file__))
+    csvPath = os.path.join(dirname, "csv")
+    for root, dirs, files in os.walk(csvPath):
+        for filename in fnmatch.filter(files, "*.csv"):
+            flsList.append(os.path.splitext(filename)[0])
+    instrs = []
+    for i in range(0, len(flsList)):
+        substr = "{0} - {1}".format(i + 1, flsList[i])
+        instrs.append(substr)
+    instr = "Choose from the following files:\n" + "\n".join(instrs) +"\nYour choice: "
+    while True:
+        try:
+            opt = input(instr)
+            if (int(opt) - 1) not in range(0, len(flsList)):
+                raise Exception(2)
+            else:
+                dataSet = CplryDataSet(flsList[int(opt) - 1])
+            break
+        except Exception as e:
+            traceback.print_exc()
+            print(e)
+            print("Invalid choice. Please try again.")
+        else:
+            print("Unknown error.")
+
     dataSet.openFrom()
 
 def addOrSave():
@@ -391,7 +422,7 @@ def addOrSave():
     global passAddOrSave
     while True:
         try:
-            opt = input("Choose the following options: \n1 - Add new data\n2 - Print the current data set\n3 - Save the data set\n41 -  Plot tube diameter vs flow rate\n42 -  Plot [tube diameter]^4 vs flow rate\n43 - Plot tube diamter vs flow rate using semilogy() w./ power fits \n44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits \n101 - Plot with a subset\n0 - Exit the program \nYour choice: ")
+            opt = input("Choose the following options: \n1 - Add new data\n2 - Print the current data set\n3 - Save the data set\n41 - Plot tube diameter vs flow rate\n42 - Plot [tube diameter]^4 vs flow rate\n43 - Plot tube diamter vs flow rate using semilogy() w./ power fits \n44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits \n101 - Plot with a subset\n0 - Exit the program \nYour choice: ")
             if opt == "1":
                 dataSet.add()
             elif opt == "2":
@@ -400,7 +431,7 @@ def addOrSave():
                 dataSet.save()
             elif 40 <= int(opt) <= 59:
                 dataSet.plot(int(opt))
-            elif opt =="101":
+            elif opt == "101":
                 while True:
                     try:
                         pltOpt = input("Please Enter your plotting option: ")
