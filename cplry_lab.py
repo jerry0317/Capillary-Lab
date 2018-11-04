@@ -258,22 +258,33 @@ class CplryDataSet:
             except Exception:
                 print("Invalid choice. Please try again.")
 
-    def view(self):
+    def view(self, option = 1):
         table = PrettyTable()
-        table.field_names = self.defaultFileHeader() + ["Flow Rate"]
-        for row in self.data:
-            table.add_row([
-            row.tubeLength,
-            row.tubeDiameter,
-            row.heightDiff,
-            row.flowTime,
-            round(row.flowVolumeBefore,5),
-            round(row.flowVolumeAfter,5),
-            row.uncertaintyInT,
-            round(row.uncertaintyInV, 3),
-            ("N/A" if str(row.notes) == "" else str(row.notes)),
-            round(row.flowRate(),5)
-            ])
+        if option == 1:
+            table.field_names = self.defaultFileHeader() + ["Flow Rate", "Uncertainty"]
+            for row in self.data:
+                table.add_row([
+                    row.tubeLength,
+                    row.tubeDiameter,
+                    row.heightDiff,
+                    row.flowTime,
+                    round(row.flowVolumeBefore,5),
+                    round(row.flowVolumeAfter,5),
+                    row.uncertaintyInT,
+                    round(row.uncertaintyInV, 3),
+                    ("N/A" if str(row.notes) == "" else str(row.notes)),
+                    round(row.flowRate(),5),
+                    round(row.uncertaintyFlowRate(),5)
+                ])
+        elif option == 2:
+            table.field_names = ["Tube Diameter", "Avg Flow Rate", "Uncertainty", "STD"]
+            for row in self.data:
+                table.add_row([
+                    row.tubeDiameter,
+                    round(row.avgFlowRate(),5),
+                    round(row.avgUncertaintyFlowRate(),5),
+                    round(row.std(),5)
+                ])
         print(table)
         pass
 
@@ -386,6 +397,7 @@ class CplryDataSet:
                     pData.flowVolumeDiffs.append(d.flowVolumeDiff())
                     pData.uncertainties.append(d.uncertaintyFlowRate())
             groupSet.data.append(pData)
+        groupSet.data.sort(key = lambda d: gParameter(d))
 
         return groupSet
 
@@ -526,11 +538,14 @@ def addOrSave():
     global passAddOrSave
     while True:
         try:
-            opt = input("-----Current Set Name: {0}-----\nChoose the following options: \n1 - Add new data\n2 - Print the current data set\n3 - Save the data set\n41 - Plot tube diameter vs flow rate\n42 - Plot [tube diameter]^4 vs flow rate\n43 - Plot tube diamter vs flow rate using semilogy() w./ power fits \n44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits \n101 - Plot with a subset\n121 - Find fit model about tube diameter vs flow rate with significance level\n9 - Switch to another data set\n0 - Exit the program \nYour choice: ".format(dataSet.name))
+            opt = input("-----Current Set Name: {0}-----\nChoose the following options: \n1 - Add new data\n2 - Print the current data set\n21 - Print the data set w./ group by tube diameter\n3 - Save the data set\n41 - Plot tube diameter vs flow rate\n42 - Plot [tube diameter]^4 vs flow rate\n43 - Plot tube diamter vs flow rate using semilogy() w./ power fits \n44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits \n101 - Plot with a subset\n121 - Find fit model about tube diameter vs flow rate with significance level\n9 - Switch to another data set\n0 - Exit the program \nYour choice: ".format(dataSet.name))
             if opt == "1":
                 dataSet.add()
             elif opt == "2":
                 dataSet.view()
+            elif opt == "21":
+                group = dataSet.groupBy("tubeDiameter")
+                group.view(2)
             elif opt == "3":
                 dataSet.save()
             elif 40 <= int(opt) <= 59:
@@ -581,4 +596,4 @@ initiate()
 while passAddOrSave != True:
     addOrSave()
 
-print("Session ended.")
+print("-----Session ended.-----")
