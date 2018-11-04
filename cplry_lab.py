@@ -275,29 +275,12 @@ class CplryDataSet:
             # y_std = group.listFromData("stdFlowRate")
             xp = np.linspace(min(x_data), max(x_data), 100)
             lFitP = {}
-            csq = {}
             tb = PrettyTable()
             tb.field_names = ['Name', 'Poly Fit Equation', 'Chi-squared', 'p-value']
-            def fitFunc(p):
-                def func(x, a, b):
-                    return a + b * x ** p
-                return func
             for i in [2, 3, 4, 5]:
-                lFitP[i], _ = curve_fit(fitFunc(i), np.array(x_data), np.array(y_data))
-                plt.plot(xp, fitFunc(i)(xp, *lFitP[i]), '-', linewidth=1, label=r"$d^{0}$ fit".format(i))
-                csq = cst.chisquare(obs=y_data, exp=[fitFunc(i)(xd, *lFitP[i]) for xd in x_data], std=y_error, ddof=2)
-                # csq = stats.chisquare(y_data, f_exp=[fitFunc(i)(xd, *lFitP[i]) for xd in x_data], ddof=1)
-                dgs = 4
-                substrs = []
-                for j, k in enumerate(lFitP[i]):
-                    if j == 0:
-                        apStr = str(round(k, dgs))
-                        substrs.append(apStr)
-                    elif j == 1:
-                        apStr = str(round(k, dgs)) + "x^" + str(i)
-                        substrs.append(apStr)
-                pStr = "y=" + "+".join(substrs)
-                tb.add_row(["d^{0} fit".format(i), pStr, str(round(csq[0],5)), str(round(csq[1],5))])
+                lFitP[i], csq, eq, func = CplryDataSet.singlePloyFit(x_data, y_data, y_error, i, 4)
+                plt.plot(xp, func(xp, *lFitP[i]), '-', linewidth=1, label=r"$d^{0}$ fit".format(i))
+                tb.add_row(["d^{0} fit".format(i), eq, str(round(csq[0],5)), str(round(csq[1],5))])
 
             print(tb)
             plt.legend(loc="upper left")
@@ -352,7 +335,7 @@ class CplryDataSet:
                 return dt.tubeLength
             else:
                 return None
-                
+
         def assignGP(a, b):
             if option == "tubeDiameter":
                 a.tubeDiameter = b
@@ -373,6 +356,82 @@ class CplryDataSet:
             groupSet.data.append(pData)
 
         return groupSet
+
+    def calculate(self, option):
+        if option == 121:
+            while True:
+                try:
+                    sigLI = input("Enter the desired significance level (0.05 by default): ")
+                    if sigLI == "":
+                        sigL = 0.05
+                    else:
+                        sigL = float(sigLI)
+                    if (sigL > 1) or (sigL < 0):
+                        raise Exception(3)
+                    break
+                except Exception(3):
+                    print("Significance level must be between 0 and 1. Please try again.")
+                else:
+                    traceback.print_exc()
+
+            group = self.groupBy("tubeDiameter")
+            group.data.sort(key=lambda d: d.tubeDiameter)
+
+            validList = []
+
+            lrg = range(3, len(group.data) + 1) # Each util must contain at least 3 data points
+            for lr in lrg:
+                irg = range(0, len(group.data) - lr + 1) # The index range
+                for ir in irg:
+                    subGroup = group.data[ir : ir + lr]
+                    subGroupSet = CplryDataSet()
+                    subGroupSet.data = subGroup
+                    x_data = subGroupSet.listFromData("tubeDiameter")
+                    y_data = subGroupSet.listFromData("avgFlowRate")
+                    y_error = subGroupSet.listFromData("uncertaintyFlowRate")
+                    for i in [2, 3, 4, 5]:
+                        lFitP, csq, eq, _ = CplryDataSet.singlePloyFit(x_data, y_data, y_error, i, 4)
+
+                        if csq[1] >= sigL:
+                            vData = {
+                                "dataSet": subGroupSet,
+                                "power": i,
+                                "fitModel": lFitP,
+                                "csq": csq,
+                                "equation": eq,
+                                "chi-squared": csq[0],
+                                "p-value": csq[1]
+                            }
+                            validList.append(vData)
+
+            tb = PrettyTable()
+            tb.field_names = ["Data Set", "Data Length", "Model Type", "Fit Equation", "Chi-sqaured", "p-value"]
+            for ld in validList:
+                dataSetStr = ", ".join([str(round(d.tubeDiameter, 4)) + "mm" for d in ld["dataSet"].data])
+                tb.add_row([dataSetStr, len(ld["dataSet"].data), "d^{0} fit".format(ld["power"]), ld["equation"], round(ld["chi-squared"],4), round(ld["p-value"],4)])
+            print(tb)
+
+    @staticmethod
+    def singlePloyFit(xd, yd, yerr, power, dgs = 4):
+        def fitFunc(p):
+            def func(x, a, b):
+                return a + b * x ** p
+            return func
+        lFitP, _ = curve_fit(fitFunc(power), np.array(xd), np.array(yd))
+        csq = cst.chisquare(obs = yd, exp = [fitFunc(power)(xpt, *lFitP) for xpt in xd], std=yerr, ddof=2)
+
+        substrs = []
+        for j, k in enumerate(lFitP):
+            if j == 0:
+                apStr = str(round(k, dgs))
+                substrs.append(apStr)
+            elif j == 1:
+                apStr = str(round(k, dgs)) + "x^" + str(power)
+                substrs.append(apStr)
+        pStr = "y=" + "+".join(substrs)
+
+        return lFitP, csq, pStr, fitFunc(power)
+
 
 
 def initiate():
@@ -435,7 +494,7 @@ def addOrSave():
     global passAddOrSave
     while True:
         try:
-            opt = input("Choose the following options: \n1 - Add new data\n2 - Print the current data set\n3 - Save the data set\n41 - Plot tube diameter vs flow rate\n42 - Plot [tube diameter]^4 vs flow rate\n43 - Plot tube diamter vs flow rate using semilogy() w./ power fits \n44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits \n101 - Plot with a subset\n0 - Exit the program \nYour choice: ")
+            opt = input("Choose the following options: \n1 - Add new data\n2 - Print the current data set\n3 - Save the data set\n41 - Plot tube diameter vs flow rate\n42 - Plot [tube diameter]^4 vs flow rate\n43 - Plot tube diamter vs flow rate using semilogy() w./ power fits \n44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits \n101 - Plot with a subset\n121 - Find fit model about tube diameter vs flow rate with significance level\n0 - Exit the program \nYour choice: ")
             if opt == "1":
                 dataSet.add()
             elif opt == "2":
@@ -453,6 +512,8 @@ def addOrSave():
                     except ValueError:
                         print("Invalid Value. Please try again.")
                 dataSet.subPlot(pltOpt)
+            elif 120 <= int(opt) <= 139:
+                dataSet.calculate(int(opt))
             elif opt == "0":
                 while True:
                     try:

@@ -106,3 +106,4 @@ venv.bak/
 
 # csv location
 csv/
+test.py
