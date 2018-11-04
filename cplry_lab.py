@@ -57,7 +57,7 @@ class CplrySingleGroupData(CplryData):
         try:
             std = stdev(self.flowRates)
         except StatisticsError:
-            std = 0
+            std = (0.01 * self.avgFlowRate())
         return std
 
     def stdErr(self):
@@ -417,7 +417,7 @@ class CplryDataSet:
             def func(x, a, b):
                 return a + b * x ** p
             return func
-        lFitP, _ = curve_fit(fitFunc(power), np.array(xd), np.array(yd))
+        lFitP, _ = curve_fit(fitFunc(power), np.array(xd), np.array(yd), sigma=yerr, absolute_sigma=True)
         csq = cst.chisquare(obs = yd, exp = [fitFunc(power)(xpt, *lFitP) for xpt in xd], std=yerr, ddof=2)
 
         substrs = []
@@ -494,7 +494,7 @@ def addOrSave():
     global passAddOrSave
     while True:
         try:
-            opt = input("Choose the following options: \n1 - Add new data\n2 - Print the current data set\n3 - Save the data set\n41 - Plot tube diameter vs flow rate\n42 - Plot [tube diameter]^4 vs flow rate\n43 - Plot tube diamter vs flow rate using semilogy() w./ power fits \n44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits \n101 - Plot with a subset\n121 - Find fit model about tube diameter vs flow rate with significance level\n0 - Exit the program \nYour choice: ")
+            opt = input("-----Current Set Name: {0}-----\nChoose the following options: \n1 - Add new data\n2 - Print the current data set\n3 - Save the data set\n41 - Plot tube diameter vs flow rate\n42 - Plot [tube diameter]^4 vs flow rate\n43 - Plot tube diamter vs flow rate using semilogy() w./ power fits \n44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits \n101 - Plot with a subset\n121 - Find fit model about tube diameter vs flow rate with significance level\n9 - Switch to another data set\n0 - Exit the program \nYour choice: ".format(dataSet.name))
             if opt == "1":
                 dataSet.add()
             elif opt == "2":
@@ -503,6 +503,8 @@ def addOrSave():
                 dataSet.save()
             elif 40 <= int(opt) <= 59:
                 dataSet.plot(int(opt))
+            elif opt == "9":
+                openDataSet()
             elif opt == "101":
                 while True:
                     try:
