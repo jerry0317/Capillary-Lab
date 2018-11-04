@@ -24,6 +24,8 @@ class CplryData(object):
     flowTime = 0.0 # s
     flowVolumeBefore = 0.0 # mL
     flowVolumeAfter = 0.0 # mL
+    uncertaintyInT = 0.0 # s
+    uncertaintyInV = 0.0 # mL
     notes = ""
 
     def flowVolumeDiff(self):
@@ -38,17 +40,22 @@ class CplryData(object):
     def flowRate(self):
         return (self.flowVolumeDiff() / self.flowTime)
 
+    def uncertaintyFlowRate(self):
+        return (((self.uncertaintyInV / self.flowVolumeDiff()) + (self.uncertaintyInT / self.flowTime)) * self.flowRate())
+
 
 class CplrySingleGroupData(CplryData):
     groupedBy = ""
     flowRates = []
     flowTimes = []
     flowVolumeDiffs = []
+    uncertainties = []
 
     def __init__(self):
         self.flowRates = []
         self.flowTimes = []
         self.flowVolumeDiffs = []
+        self.uncertainties = []
 
     def avgFlowRate(self):
         return mean(self.flowRates)
@@ -65,12 +72,13 @@ class CplrySingleGroupData(CplryData):
         stdErr = self.std() / math.sqrt(n)
         return stdErr
 
+    def avgUncertaintyFlowRate(self):
+        return mean(self.uncertainties)
+
 
 class CplryDataSet:
     name = "Untitled"
     data = []
-    uncertaintyInT = 0.005
-    uncertaintyInV = 1.0
 
     def __init__(self, name = "Untitled"):
         self.data = []
@@ -83,7 +91,7 @@ class CplryDataSet:
         return csvFilePath
 
     def defaultFileHeader(self):
-        return ["Tube Length", "Tube Diameter", "Height Difference", "Flow Time", "Initial Volume", "Final Volume", "Notes"]
+        return ["Tube Length", "Tube Diameter", "Height Difference", "Flow Time", "Initial Volume", "Final Volume", "Time Uncertainty", "Volume Uncertainty", "Notes"]
 
     def openFrom(self, path="DEFAULT"):
         if path == "DEFAULT":
@@ -101,7 +109,9 @@ class CplryDataSet:
             dataRow.flowTime = float(row[h[3]])
             dataRow.flowVolumeBefore = float(row[h[4]])
             dataRow.flowVolumeAfter = float(row[h[5]])
-            dataRow.notes = str(row[h[6]])
+            dataRow.uncertaintyInT = float(row[h[6]])
+            dataRow.uncertaintyInV = float(row[h[7]])
+            dataRow.notes = str(row[h[8]])
             self.data.append(dataRow)
 
         print("The data set has been successfully loaded from CSV file.")
@@ -121,7 +131,9 @@ class CplryDataSet:
             h[3]: row.flowTime,
             h[4]: row.flowVolumeBefore,
             h[5]: row.flowVolumeAfter,
-            h[6]: ("N/A" if str(row.notes) == "" else str(row.notes))
+            h[6]: row.uncertaintyInT,
+            h[7]: row.uncertaintyInV,
+            h[8]: ("N/A" if str(row.notes) == "" else str(row.notes))
             })
 
         csvFile.close()
@@ -159,6 +171,16 @@ class CplryDataSet:
             except ValueError:
                 print("Invalid input. Please try again.")
         while True:
+            try:
+                uftTime = input("Enter the uncertainty of time measurement in s (0.005 by default): ")
+                if uftTime == "":
+                    data.uncertaintyInT = 0.005
+                else:
+                    data.uncertaintyInT = float(uftTime)
+                break
+            except ValueError:
+                print("Invalid input. Please try again.")
+        while True:
             opt = input("Choose from the following options:\n1 - Enter flow volumes directly\n2 - Enter flow masses to get volumes\nYour choice: ")
             try:
                 if opt == "1":
@@ -176,17 +198,17 @@ class CplryDataSet:
                             break
                         except ValueError:
                             print("Invalid input. Please try again.")
-                    pass
+                    while True:
+                        try:
+                            utv = input("Enter the uncertainty in volume measurement in mL (1.0 by default): ")
+                            if utv == "":
+                                data.uncertaintyInV = 1.0
+                            else:
+                                data.uncertaintyInV = float(utv)
+                            break
+                        except ValueError:
+                            print("Invalid input. Please try again.")
                 elif opt == "2":
-                    # while True:
-                    #     try:
-                    #         rTemp = input("Enter the room temperature in Celsius (25 by Default): ")
-                    #         if rTemp == "":
-                    #             roomTemp = 25.0
-                    #         else:
-                    #             roomTemp = float(rTemp)
-                    #     except ValueError:
-                    #         print("Invalid input. Please try again.")
                     while True:
                         try:
                             massI = input("Enter the initial mass in g: ")
@@ -200,6 +222,17 @@ class CplryDataSet:
                             massF = input("Enter the final mass in g: ")
                             flowMassAfter = float(massF)
                             data.flowVolumeAfter = (flowMassAfter/ 0.997)
+                            break
+                        except ValueError:
+                            print("Invalid input. Please try again.")
+                    while True:
+                        try:
+                            utm = input("Enter the uncertainty in mass measurement in g (1.0 by default): ")
+                            if utm == "":
+                                data.uncertaintyInV = (1 / 0.997)
+                            else:
+                                utmv = float(utm)
+                                data.uncertaintyInV = (utmv/ 0.997)
                             break
                         except ValueError:
                             print("Invalid input. Please try again.")
@@ -236,6 +269,8 @@ class CplryDataSet:
             row.flowTime,
             round(row.flowVolumeBefore,5),
             round(row.flowVolumeAfter,5),
+            row.uncertaintyInT,
+            round(row.uncertaintyInV, 3),
             ("N/A" if str(row.notes) == "" else str(row.notes)),
             round(row.flowRate(),5)
             ])
@@ -250,7 +285,6 @@ class CplryDataSet:
             group = self.groupBy("tubeDiameter")
             x_data = group.listFromData("tubeDiameter")
             y_data = group.listFromData("avgFlowRate")
-            # y_error = group.listFromData("stdErrFlowRate")
             y_error = group.listFromData("uncertaintyFlowRate")
             plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
             plt.xlabel("Tube diameter (mm)")
@@ -259,7 +293,6 @@ class CplryDataSet:
             group = self.groupBy("tubeDiameter")
             x_data = group.listFromData("tubeDiameterP4")
             y_data = group.listFromData("avgFlowRate")
-            # y_error = group.listFromData("stdErrFlowRate")
             y_error = group.listFromData("uncertaintyFlowRate")
             plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
             plt.xlabel("[Tube diameter]^4 (mm^4)")
@@ -268,11 +301,9 @@ class CplryDataSet:
             group = self.groupBy("tubeDiameter")
             x_data = group.listFromData("tubeDiameter")
             y_data = group.listFromData("avgFlowRate")
-            # y_error = group.listFromData("stdErrFlowRate")
             y_error = group.listFromData("uncertaintyFlowRate")
             plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
 
-            # y_std = group.listFromData("stdFlowRate")
             xp = np.linspace(min(x_data), max(x_data), 100)
             lFitP = {}
             tb = PrettyTable()
@@ -319,7 +350,7 @@ class CplryDataSet:
         elif option == "stdErrFlowRate":
             dList = [gd.stdErr() for gd in self.data]
         elif option == "uncertaintyFlowRate":
-            dList = [(((self.uncertaintyInV / mean(gd.flowVolumeDiffs)) + (self.uncertaintyInT / mean(gd.flowTimes))) * gd.avgFlowRate()) for gd in self.data]
+            dList = [gd.avgUncertaintyFlowRate() for gd in self.data]
         elif option == "stdFlowRate":
             dList = [gd.std() for gd in self.data]
         return dList
@@ -353,6 +384,7 @@ class CplryDataSet:
                     pData.flowRates.append(d.flowRate())
                     pData.flowTimes.append(d.flowTime)
                     pData.flowVolumeDiffs.append(d.flowVolumeDiff())
+                    pData.uncertainties.append(d.uncertaintyFlowRate())
             groupSet.data.append(pData)
 
         return groupSet
