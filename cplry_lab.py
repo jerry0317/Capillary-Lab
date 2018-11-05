@@ -75,6 +75,9 @@ class CplrySingleGroupData(CplryData):
     def avgUncertaintyFlowRate(self):
         return mean(self.uncertainties)
 
+    def length(self):
+        return len(self.flowRates)
+
 
 class CplryDataSet:
     name = "Untitled"
@@ -296,7 +299,7 @@ class CplryDataSet:
             group = self.groupBy("tubeDiameter")
             x_data = group.listFromData("tubeDiameter")
             y_data = group.listFromData("avgFlowRate")
-            y_error = group.listFromData("uncertaintyFlowRate")
+            y_error = group.listFromData("uErrorFlowRate")
             plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
             plt.xlabel("Tube diameter (mm)")
             plt.ylabel("Flow Rate (cm^3/s)")
@@ -304,7 +307,7 @@ class CplryDataSet:
             group = self.groupBy("tubeDiameter")
             x_data = group.listFromData("tubeDiameterP4")
             y_data = group.listFromData("avgFlowRate")
-            y_error = group.listFromData("uncertaintyFlowRate")
+            y_error = group.listFromData("uErrorFlowRate")
             plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
             plt.xlabel("[Tube diameter]^4 (mm^4)")
             plt.ylabel("Flow Rate (cm^3/s)")
@@ -312,7 +315,7 @@ class CplryDataSet:
             group = self.groupBy("tubeDiameter")
             x_data = group.listFromData("tubeDiameter")
             y_data = group.listFromData("avgFlowRate")
-            y_error = group.listFromData("uncertaintyFlowRate")
+            y_error = group.listFromData("uErrorFlowRate")
             plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
 
             xp = np.linspace(min(x_data), max(x_data), 100)
@@ -362,6 +365,8 @@ class CplryDataSet:
             dList = [gd.stdErr() for gd in self.data]
         elif option == "uncertaintyFlowRate":
             dList = [gd.avgUncertaintyFlowRate() for gd in self.data]
+        elif option == "uErrorFlowRate":
+            dList = [gd.avgUncertaintyFlowRate() / math.sqrt(gd.length()) for gd in self.data]
         elif option == "stdFlowRate":
             dList = [gd.std() for gd in self.data]
         return dList
