@@ -18,14 +18,14 @@ from scipy.optimize import curve_fit
 
 
 class CplryData(object):
-    tubeLength = 0.0 # inch
-    tubeDiameter = 0.0 # mm
-    heightDiff = 0.0 # cm #Height Difference between the top surface and the bottom of the tube
-    flowTime = 0.0 # s
-    flowVolumeBefore = 0.0 # mL
-    flowVolumeAfter = 0.0 # mL
-    uncertaintyInT = 0.0 # s
-    uncertaintyInV = 0.0 # mL
+    tubeLength = 0.0  # inch
+    tubeDiameter = 0.0  # mm
+    heightDiff = 0.0  # cm: Height Difference between the top surface and the top of the tube
+    flowTime = 0.0  # s
+    flowVolumeBefore = 0.0  # mL
+    flowVolumeAfter = 0.0  # mL
+    uncertaintyInT = 0.0  # s
+    uncertaintyInV = 0.0  # mL
     notes = ""
 
     def flowVolumeDiff(self):
@@ -35,7 +35,7 @@ class CplryData(object):
         return (self.tubeDiameter / 2)
 
     def flowPressure(self):
-        return (997 * 9.8 * (self.heightDiff - (self.tubeLength * 2.54)) / 100)
+        return (997 * 9.8 * (self.heightDiff) / 100)
 
     def flowRate(self):
         return (self.flowVolumeDiff() / self.flowTime)
@@ -83,7 +83,7 @@ class CplryDataSet:
     name = "Untitled"
     data = []
 
-    def __init__(self, name = "Untitled"):
+    def __init__(self, name="Untitled"):
         self.data = []
         self.name = name
 
@@ -128,15 +128,15 @@ class CplryDataSet:
 
         for row in self.data:
             dict_writer.writerow({
-            h[0]: row.tubeLength,
-            h[1]: row.tubeDiameter,
-            h[2]: row.heightDiff,
-            h[3]: row.flowTime,
-            h[4]: row.flowVolumeBefore,
-            h[5]: row.flowVolumeAfter,
-            h[6]: row.uncertaintyInT,
-            h[7]: row.uncertaintyInV,
-            h[8]: ("N/A" if str(row.notes) == "" else str(row.notes))
+                h[0]: row.tubeLength,
+                h[1]: row.tubeDiameter,
+                h[2]: row.heightDiff,
+                h[3]: row.flowTime,
+                h[4]: row.flowVolumeBefore,
+                h[5]: row.flowVolumeAfter,
+                h[6]: row.uncertaintyInT,
+                h[7]: row.uncertaintyInV,
+                h[8]: ("N/A" if str(row.notes) == "" else str(row.notes))
             })
 
         csvFile.close()
@@ -175,7 +175,8 @@ class CplryDataSet:
                 print("Invalid input. Please try again.")
         while True:
             try:
-                uftTime = input("Enter the uncertainty of time measurement in s (0.005 by default): ")
+                uftTime = input(
+                    "Enter the uncertainty of time measurement in s (0.005 by default): ")
                 if uftTime == "":
                     data.uncertaintyInT = 0.005
                 else:
@@ -184,7 +185,8 @@ class CplryDataSet:
             except ValueError:
                 print("Invalid input. Please try again.")
         while True:
-            opt = input("Choose from the following options:\n1 - Enter flow volumes directly\n2 - Enter flow masses to get volumes\nYour choice: ")
+            opt = input(
+                "Choose from the following options:\n1 - Enter flow volumes directly\n2 - Enter flow masses to get volumes\nYour choice: ")
             try:
                 if opt == "1":
                     while True:
@@ -203,7 +205,8 @@ class CplryDataSet:
                             print("Invalid input. Please try again.")
                     while True:
                         try:
-                            utv = input("Enter the uncertainty in volume measurement in mL (1.0 by default): ")
+                            utv = input(
+                                "Enter the uncertainty in volume measurement in mL (1.0 by default): ")
                             if utv == "":
                                 data.uncertaintyInV = 1.0
                             else:
@@ -224,18 +227,19 @@ class CplryDataSet:
                         try:
                             massF = input("Enter the final mass in g: ")
                             flowMassAfter = float(massF)
-                            data.flowVolumeAfter = (flowMassAfter/ 0.997)
+                            data.flowVolumeAfter = (flowMassAfter / 0.997)
                             break
                         except ValueError:
                             print("Invalid input. Please try again.")
                     while True:
                         try:
-                            utm = input("Enter the uncertainty in mass measurement in g (1.0 by default): ")
+                            utm = input(
+                                "Enter the uncertainty in mass measurement in g (1.0 by default): ")
                             if utm == "":
                                 data.uncertaintyInV = (1 / 0.997)
                             else:
                                 utmv = float(utm)
-                                data.uncertaintyInV = (utmv/ 0.997)
+                                data.uncertaintyInV = (utmv / 0.997)
                             break
                         except ValueError:
                             print("Invalid input. Please try again.")
@@ -261,32 +265,34 @@ class CplryDataSet:
             except Exception:
                 print("Invalid choice. Please try again.")
 
-    def view(self, option = 1):
+    def view(self, option=1):
         table = PrettyTable()
         if option == 1:
-            table.field_names = self.defaultFileHeader() + ["Flow Rate", "Uncertainty"]
+            table.field_names = self.defaultFileHeader() + \
+                ["Flow Rate", "Uncertainty"]
             for row in self.data:
                 table.add_row([
                     row.tubeLength,
                     row.tubeDiameter,
                     row.heightDiff,
                     row.flowTime,
-                    round(row.flowVolumeBefore,5),
-                    round(row.flowVolumeAfter,5),
+                    round(row.flowVolumeBefore, 5),
+                    round(row.flowVolumeAfter, 5),
                     row.uncertaintyInT,
                     round(row.uncertaintyInV, 3),
                     ("N/A" if str(row.notes) == "" else str(row.notes)),
-                    round(row.flowRate(),5),
-                    round(row.uncertaintyFlowRate(),5)
+                    round(row.flowRate(), 5),
+                    round(row.uncertaintyFlowRate(), 5)
                 ])
         elif option == 2:
-            table.field_names = ["Tube Diameter", "Avg Flow Rate", "Uncertainty", "STD"]
+            table.field_names = ["Tube Diameter",
+                                 "Avg Flow Rate", "Uncertainty", "STD"]
             for row in self.data:
                 table.add_row([
                     row.tubeDiameter,
-                    round(row.avgFlowRate(),5),
-                    round(row.avgUncertaintyFlowRate(),5),
-                    round(row.std(),5)
+                    round(row.avgFlowRate(), 5),
+                    round(row.avgUncertaintyFlowRate(), 5),
+                    round(row.std(), 5)
                 ])
         print(table)
         pass
@@ -300,7 +306,8 @@ class CplryDataSet:
             x_data = group.listFromData("tubeDiameter")
             y_data = group.listFromData("avgFlowRate")
             y_error = group.listFromData("uErrorFlowRate")
-            plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
+            plt.errorbar(x_data, y_data, yerr=y_error,
+                         fmt='ko', markersize=4, elinewidth=1)
             plt.xlabel("Tube diameter (mm)")
             plt.ylabel("Flow Rate (cm^3/s)")
         elif option == 42:
@@ -308,7 +315,8 @@ class CplryDataSet:
             x_data = group.listFromData("tubeDiameterP4")
             y_data = group.listFromData("avgFlowRate")
             y_error = group.listFromData("uErrorFlowRate")
-            plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
+            plt.errorbar(x_data, y_data, yerr=y_error,
+                         fmt='ko', markersize=4, elinewidth=1)
             plt.xlabel("[Tube diameter]^4 (mm^4)")
             plt.ylabel("Flow Rate (cm^3/s)")
         elif option in [43, 44]:
@@ -316,16 +324,21 @@ class CplryDataSet:
             x_data = group.listFromData("tubeDiameter")
             y_data = group.listFromData("avgFlowRate")
             y_error = group.listFromData("uErrorFlowRate")
-            plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
+            plt.errorbar(x_data, y_data, yerr=y_error,
+                         fmt='ko', markersize=4, elinewidth=1)
 
             xp = np.linspace(min(x_data), max(x_data), 100)
             lFitP = {}
             tb = PrettyTable()
-            tb.field_names = ['Name', 'Poly Fit Equation', 'Chi-squared', 'p-value']
+            tb.field_names = ['Name', 'Poly Fit Equation',
+                              'Chi-squared', 'p-value']
             for i in [2, 3, 4, 5]:
-                lFitP[i], csq, eq, func = CplryDataSet.singlePloyFit(x_data, y_data, y_error, i, 4)
-                plt.plot(xp, func(xp, *lFitP[i]), '-', linewidth=1, label=r"$d^{0}$ fit".format(i))
-                tb.add_row(["d^{0} fit".format(i), eq, str(round(csq[0],5)), str(round(csq[1],5))])
+                lFitP[i], csq, eq, func = CplryDataSet.singlePloyFit(
+                    x_data, y_data, y_error, i, 4)
+                plt.plot(
+                    xp, func(xp, *lFitP[i]), '-', linewidth=1, label=r"$d^{0}$ fit".format(i))
+                tb.add_row(["d^{0} fit".format(i), eq, str(
+                    round(csq[0], 5)), str(round(csq[1], 5))])
 
             print(tb)
             plt.legend(loc="upper left")
@@ -334,6 +347,27 @@ class CplryDataSet:
             plt.ylabel("Flow Rate (cm^3/s)")
             if option == 43:
                 plt.semilogy()
+        elif option == 51:
+            group = self.groupBy("tubeLength")
+            x_data = group.listFromData("tubeLength")
+            y_data = group.listFromData("avgFlowRate")
+            y_error = group.listFromData("uErrorFlowRate")
+            plt.errorbar(x_data, y_data, yerr=y_error,
+                         fmt="ko", markersize=4, elinewidth=1)
+
+            xp = np.linspace(min(x_data), max(x_data), 100)
+            tb = PrettyTable()
+            tb.field_names = ['Linear Fit Equation', 'Chi-squared', 'p-value']
+            lFitP, csq, eq, func = CplryDataSet.singlePloyFit(
+                x_data, y_data, y_error, 1, 4)
+            plt.plot(xp, func(xp, *lFitP), '-',
+                     linewidth=1, label="Linear Fit")
+            tb.add_row([eq, str(round(csq[0], 5)), str(round(csq[1], 5))])
+            print(tb)
+            plt.legend(loc="upper left")
+
+            plt.xlabel("Tube length (inch)")
+            plt.ylabel("Flow Rate (cm^3/s)")
 
         plt.show()
 
@@ -341,8 +375,10 @@ class CplryDataSet:
         length = int(len(self.data))
         while True:
             try:
-                subs = input("Enter the range natural indices of the data you want to plot, connected by \"-\", [From 1 to " + str(length) + "]: ")
-                subDataIndices = list(map(int, np.linspace(int(subs.split("-")[0]), int(subs.split("-")[1]), num=(abs(int(subs.split("-")[1]) - int(subs.split("-")[0]))+1))))
+                subs = input(
+                    "Enter the range natural indices of the data you want to plot, connected by \"-\", [From 1 to " + str(length) + "]: ")
+                subDataIndices = list(map(int, np.linspace(int(subs.split("-")[0]), int(subs.split(
+                    "-")[1]), num=(abs(int(subs.split("-")[1]) - int(subs.split("-")[0])) + 1))))
                 break
             except ValueError:
                 print("Invalid input. Please try again.")
@@ -351,7 +387,6 @@ class CplryDataSet:
         subDataSet = CplryDataSet()
         subDataSet.data = subData
         subDataSet.plot(option)
-
 
     def listFromData(self, option):
         dList = []
@@ -366,7 +401,8 @@ class CplryDataSet:
         elif option == "uncertaintyFlowRate":
             dList = [gd.avgUncertaintyFlowRate() for gd in self.data]
         elif option == "uErrorFlowRate":
-            dList = [gd.avgUncertaintyFlowRate() / math.sqrt(gd.length()) for gd in self.data]
+            dList = [gd.avgUncertaintyFlowRate() / math.sqrt(gd.length())
+                     for gd in self.data]
         elif option == "stdFlowRate":
             dList = [gd.std() for gd in self.data]
         return dList
@@ -375,6 +411,7 @@ class CplryDataSet:
         groupSet = CplryDataSet()
         tempData = self.data
         groupSet.data = []
+
         def gParameter(dt):
             if option == "tubeDiameter":
                 return dt.tubeDiameter
@@ -402,7 +439,7 @@ class CplryDataSet:
                     pData.flowVolumeDiffs.append(d.flowVolumeDiff())
                     pData.uncertainties.append(d.uncertaintyFlowRate())
             groupSet.data.append(pData)
-        groupSet.data.sort(key = lambda d: gParameter(d))
+        groupSet.data.sort(key=lambda d: gParameter(d))
 
         return groupSet
 
@@ -410,7 +447,8 @@ class CplryDataSet:
         if option == 121:
             while True:
                 try:
-                    sigLI = input("Enter the desired significance level (0.05 by default): ")
+                    sigLI = input(
+                        "Enter the desired significance level (0.05 by default): ")
                     if sigLI == "":
                         sigL = 0.05
                     else:
@@ -419,7 +457,8 @@ class CplryDataSet:
                         raise Exception(3)
                     break
                 except Exception(3):
-                    print("Significance level must be between 0 and 1. Please try again.")
+                    print(
+                        "Significance level must be between 0 and 1. Please try again.")
                 else:
                     traceback.print_exc()
 
@@ -428,18 +467,20 @@ class CplryDataSet:
 
             validList = []
 
-            lrg = range(3, len(group.data) + 1) # Each util must contain at least 3 data points
+            # Each util must contain at least 3 data points
+            lrg = range(3, len(group.data) + 1)
             for lr in lrg:
-                irg = range(0, len(group.data) - lr + 1) # The index range
+                irg = range(0, len(group.data) - lr + 1)  # The index range
                 for ir in irg:
-                    subGroup = group.data[ir : ir + lr]
+                    subGroup = group.data[ir: ir + lr]
                     subGroupSet = CplryDataSet()
                     subGroupSet.data = subGroup
                     x_data = subGroupSet.listFromData("tubeDiameter")
                     y_data = subGroupSet.listFromData("avgFlowRate")
                     y_error = subGroupSet.listFromData("uncertaintyFlowRate")
                     for i in [2, 3, 4, 5]:
-                        lFitP, csq, eq, _ = CplryDataSet.singlePloyFit(x_data, y_data, y_error, i, 4)
+                        lFitP, csq, eq, _ = CplryDataSet.singlePloyFit(
+                            x_data, y_data, y_error, i, 4)
 
                         if csq[1] >= sigL:
                             vData = {
@@ -454,20 +495,25 @@ class CplryDataSet:
                             validList.append(vData)
 
             tb = PrettyTable()
-            tb.field_names = ["Data Set", "Data Length", "Model Type", "Fit Equation", "Chi-sqaured", "p-value"]
+            tb.field_names = ["Data Set", "Data Length",
+                              "Model Type", "Fit Equation", "Chi-sqaured", "p-value"]
             for ld in validList:
-                dataSetStr = ", ".join([str(round(d.tubeDiameter, 4)) + "mm" for d in ld["dataSet"].data])
-                tb.add_row([dataSetStr, len(ld["dataSet"].data), "d^{0} fit".format(ld["power"]), ld["equation"], round(ld["chi-squared"],4), round(ld["p-value"],4)])
+                dataSetStr = ", ".join(
+                    [str(round(d.tubeDiameter, 4)) + "mm" for d in ld["dataSet"].data])
+                tb.add_row([dataSetStr, len(ld["dataSet"].data), "d^{0} fit".format(
+                    ld["power"]), ld["equation"], round(ld["chi-squared"], 4), round(ld["p-value"], 4)])
             print(tb)
 
     @staticmethod
-    def singlePloyFit(xd, yd, yerr, power, dgs = 4):
+    def singlePloyFit(xd, yd, yerr, power, dgs=4):
         def fitFunc(p):
             def func(x, a, b):
                 return a + b * x ** p
             return func
-        lFitP, _ = curve_fit(fitFunc(power), np.array(xd), np.array(yd), sigma=yerr, absolute_sigma=True)
-        csq = cst.chisquare(obs = yd, exp = [fitFunc(power)(xpt, *lFitP) for xpt in xd], std=yerr, ddof=2)
+        lFitP, _ = curve_fit(fitFunc(power), np.array(
+            xd), np.array(yd), sigma=yerr, absolute_sigma=True)
+        csq = cst.chisquare(obs=yd, exp=[fitFunc(power)(
+            xpt, *lFitP) for xpt in xd], std=yerr, ddof=2)
 
         substrs = []
         for j, k in enumerate(lFitP):
@@ -480,7 +526,6 @@ class CplryDataSet:
         pStr = "y=" + "+".join(substrs)
 
         return lFitP, csq, pStr, fitFunc(power)
-
 
 
 def initiate():
@@ -502,11 +547,13 @@ def initiate():
         else:
             print("Unknown error. Please try again.")
 
+
 def newDataSet():
     global dataSet
     nm = input("Name the new data set: ")
     dataSet = CplryDataSet(nm)
     print("You created a new data set called " + dataSet.name)
+
 
 def openDataSet():
     global dataSet
@@ -520,7 +567,8 @@ def openDataSet():
     for i in range(0, len(flsList)):
         substr = "{0} - {1}".format(i + 1, flsList[i])
         instrs.append(substr)
-    instr = "Choose from the following files:\n" + "\n".join(instrs) +"\nYour choice: "
+    instr = "Choose from the following files:\n" + \
+        "\n".join(instrs) + "\nYour choice: "
     while True:
         try:
             opt = input(instr)
@@ -538,12 +586,14 @@ def openDataSet():
 
     dataSet.openFrom()
 
+
 def addOrSave():
     global dataSet
     global passAddOrSave
     while True:
         try:
-            opt = input("-----Current Set Name: {0}-----\nChoose the following options: \n1 - Add new data\n2 - Print the current data set\n21 - Print the data set w./ group by tube diameter\n3 - Save the data set\n41 - Plot tube diameter vs flow rate\n42 - Plot [tube diameter]^4 vs flow rate\n43 - Plot tube diamter vs flow rate using semilogy() w./ power fits \n44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits \n101 - Plot with a subset\n121 - Find fit model about tube diameter vs flow rate with significance level\n9 - Switch to another data set\n0 - Exit the program \nYour choice: ".format(dataSet.name))
+            opt = input(
+                "-----Current Set Name: {0}-----\nChoose the following options: \n1 - Add new data\n2 - Print the current data set\n21 - Print the data set w./ group by tube diameter\n3 - Save the data set\n41 - Plot tube diameter vs flow rate\n42 - Plot [tube diameter]^4 vs flow rate\n43 - Plot tube diamter vs flow rate using semilogy() w./ power fits \n44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits\n51 - Plot tube length vs flow rate w./ linear fit\n101 - Plot with a subset\n121 - Find fit model about tube diameter vs flow rate with significance level\n9 - Switch to another data set\n0 - Exit the program \nYour choice: ".format(dataSet.name))
             if opt == "1":
                 dataSet.add()
             elif opt == "2":
@@ -553,7 +603,7 @@ def addOrSave():
                 group.view(2)
             elif opt == "3":
                 dataSet.save()
-            elif 40 <= int(opt) <= 59:
+            elif 40 <= int(opt) <= 69:
                 dataSet.plot(int(opt))
             elif opt == "9":
                 openDataSet()
@@ -591,6 +641,7 @@ def addOrSave():
             print("Invalid choice. Please try again.")
         else:
             print("Unknown error.")
+
 
 passAddOrSave = False
 
