@@ -142,107 +142,41 @@ class CplryDataSet:
         csvFile.close()
         print("File has been successfully saved.")
 
+    def __promptForValue(self, prompt, default=None):
+        while True:
+            try:
+                if default != None:
+                    prompt = prompt + " ({} by default): ".format(default)
+                else:
+                    prompt = prompt + ": "
+                value = input(prompt)
+                if default != None and value == "":
+                    return default
+                return float(value)
+                break
+            except ValueError:
+                print("Invalid input. Please try again.")
+
     def add(self, option=0):
         print("You initiated a new row of data.")
         data = CplryData()
-        while True:
-            try:
-                tLength = input("Enter the tube length in inch: ")
-                data.tubeLength = float(tLength)
-                break
-            except ValueError:
-                print("Invalid input. Please try again.")
-        while True:
-            try:
-                tDiameter = input("Enter the tube diamter in mm: ")
-                data.tubeDiameter = float(tDiameter)
-                break
-            except ValueError:
-                print("Invalid input. Please try again.")
-        while True:
-            try:
-                hDiff = input("Enter the height difference in cm: ")
-                data.heightDiff = float(hDiff)
-                break
-            except ValueError:
-                print("Invalid input. Please try again.")
-        while True:
-            try:
-                fTime = input("Enter the flow time in s: ")
-                data.flowTime = float(fTime)
-                break
-            except ValueError:
-                print("Invalid input. Please try again.")
-        while True:
-            try:
-                uftTime = input(
-                    "Enter the uncertainty of time measurement in s (0.005 by default): ")
-                if uftTime == "":
-                    data.uncertaintyInT = 0.005
-                else:
-                    data.uncertaintyInT = float(uftTime)
-                break
-            except ValueError:
-                print("Invalid input. Please try again.")
+        data.tubeLength = self.__promptForValue("Enter the tube length in inch")
+        data.tubeDiameter = self.__promptForValue("Enter the tube diamter in mm")
+        data.heightDiff = self.__promptForValue("Enter the height difference in cm")
+        data.flowTime = self.__promptForValue("Enter the flow time in s")
+        data.uncertaintyInT = self.__promptForValue("Enter the uncertainty of time measurement in s", 0.005)
         while True:
             opt = input(
                 "Choose from the following options:\n1 - Enter flow volumes directly\n2 - Enter flow masses to get volumes\nYour choice: ")
             try:
                 if opt == "1":
-                    while True:
-                        try:
-                            volumeI = input("Enter the initial volume in mL: ")
-                            data.flowVolumeBefore = float(volumeI)
-                            break
-                        except ValueError:
-                            print("Invalid input. Please try again.")
-                    while True:
-                        try:
-                            volumeF = input("Enter the final volume in mL: ")
-                            data.flowVolumeAfter = float(volumeF)
-                            break
-                        except ValueError:
-                            print("Invalid input. Please try again.")
-                    while True:
-                        try:
-                            utv = input(
-                                "Enter the uncertainty in volume measurement in mL (1.0 by default): ")
-                            if utv == "":
-                                data.uncertaintyInV = 1.0
-                            else:
-                                data.uncertaintyInV = float(utv)
-                            break
-                        except ValueError:
-                            print("Invalid input. Please try again.")
+                    data.flowVolumeBefore = self.__promptForValue("Enter the initial volume in mL")
+                    data.flowVolumeAfter = self.__promptForValue("Enter the final volume in mL")
+                    data.uncertaintyInV = self.__promptForValue("Enter the uncertainty in volume measurement in mL", 1.0)
                 elif opt == "2":
-                    while True:
-                        try:
-                            massI = input("Enter the initial mass in g: ")
-                            flowMassBefore = float(massI)
-                            data.flowVolumeBefore = (flowMassBefore / 0.997)
-                            break
-                        except ValueError:
-                            print("Invalid input. Please try again.")
-                    while True:
-                        try:
-                            massF = input("Enter the final mass in g: ")
-                            flowMassAfter = float(massF)
-                            data.flowVolumeAfter = (flowMassAfter / 0.997)
-                            break
-                        except ValueError:
-                            print("Invalid input. Please try again.")
-                    while True:
-                        try:
-                            utm = input(
-                                "Enter the uncertainty in mass measurement in g (1.0 by default): ")
-                            if utm == "":
-                                data.uncertaintyInV = (1 / 0.997)
-                            else:
-                                utmv = float(utm)
-                                data.uncertaintyInV = (utmv / 0.997)
-                            break
-                        except ValueError:
-                            print("Invalid input. Please try again.")
+                    data.flowVolumeBefore = self.__promptForValue("Enter the initial mass in g") / 0.997
+                    data.flowVolumeAfter = self.__promptForValue("Enter the final mass in g") / 0.997
+                    data.uncertaintyInV = self.__promptForValue("Enter the uncertainty in mass measurement in g", 1.0) / 0.997
                 else:
                     raise Exception(1)
                 break
@@ -275,8 +209,8 @@ class CplryDataSet:
                     row.tubeDiameter,
                     row.heightDiff,
                     row.flowTime,
-                    round(row.flowVolumeBefore, 5),
-                    round(row.flowVolumeAfter, 5),
+                    round(row.flowVolumeBefore, 1),
+                    round(row.flowVolumeAfter, 1),
                     row.uncertaintyInT,
                     round(row.uncertaintyInV, 3),
                     ("N/A" if str(row.notes) == "" else str(row.notes)),
