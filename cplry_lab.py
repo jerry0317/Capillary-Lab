@@ -245,6 +245,15 @@ class CplryDataSet:
                     round(row.avgUncertaintyFlowRate(), 5),
                     round(row.std(), 5)
                 ])
+        elif option == 5:
+            table.field_names = ["Shared Label", "Avg Flow Rate", "Uncertainty", "STD"]
+            for row in self.data:
+                table.add_row([
+                    row.notes,
+                    round(row.avgFlowRate(), 5),
+                    round(row.avgUncertaintyFlowRate(), 5),
+                    round(row.std(), 5)
+                ])
         print(table)
         pass
 
@@ -282,9 +291,9 @@ class CplryDataSet:
             lFitP = {}
             tb = PrettyTable()
             tb.field_names = ['Name', 'Poly Fit Equation', 'Chi-squared', 'p-value']
-            for i in [2, 3, 4, 5]:
+            for i in [2, 3, 4, 5, (19/7)]:
                 lFitP[i], csq, eq, func = CplryDataSet.singlePloyFit(x_data, y_data, y_sigma, i, 4)
-                plt.plot(xp, func(xp, *lFitP[i]), '-', linewidth=1, label=r"$d^{0}$ fit".format(i))
+                plt.plot(xp, func(xp, *lFitP[i]), '-', linewidth=1, label=r"$d^{0}$ fit".format(round(i,2)))
                 tb.add_row(["d^{0} fit".format(i), eq, str(round(csq[0], 5)), str(round(csq[1], 5))])
 
             print(tb)
@@ -396,6 +405,8 @@ class CplryDataSet:
                 return dt.tubeLength
             elif option == "heightDiff":
                 return dt.heightDiff
+            elif option == "notes":
+                return dt.notes
             else:
                 return None
 
@@ -406,6 +417,8 @@ class CplryDataSet:
                 a.tubeLength = b
             elif option == "heightDiff":
                 a.heightDiff = b
+            elif option == "notes":
+                a.notes = b
 
         paraList = [gParameter(d) for d in tempData]
         paraSet = list(set(paraList))
@@ -414,7 +427,7 @@ class CplryDataSet:
             assignGP(pData, p)
             pData.groupBy = option
             for d in tempData:
-                if math.isclose(p, gParameter(d)):
+                if (math.isclose(p, gParameter(d)) if type(gParameter(d)) != str else p == gParameter(d)) :
                     pData.flowRates.append(d.flowRate())
                     pData.flowTimes.append(d.flowTime)
                     pData.flowVolumeDiffs.append(d.flowVolumeDiff())
@@ -459,7 +472,7 @@ class CplryDataSet:
                     x_data = subGroupSet.listFromData("tubeDiameter")
                     y_data = subGroupSet.listFromData("avgFlowRate")
                     y_error = subGroupSet.listFromData("uncertaintyFlowRate")
-                    for i in [2, 3, 4, 5]:
+                    for i in [2, 3, 4, 5, (19/7)]:
                         lFitP, csq, eq, _ = CplryDataSet.singlePloyFit(
                             x_data, y_data, y_error, i, 4)
 
@@ -479,11 +492,33 @@ class CplryDataSet:
             tb.field_names = ["Data Set", "Data Length",
                               "Model Type", "Fit Equation", "Chi-sqaured", "p-value"]
             for ld in validList:
-                dataSetStr = ", ".join(
-                    [str(round(d.tubeDiameter, 4)) + "mm" for d in ld["dataSet"].data])
-                tb.add_row([dataSetStr, len(ld["dataSet"].data), "d^{0} fit".format(
-                    ld["power"]), ld["equation"], round(ld["chi-squared"], 4), round(ld["p-value"], 4)])
+                dataSetStr = ", ".join([str(round(d.tubeDiameter, 4)) + "mm" for d in ld["dataSet"].data])
+                tb.add_row([dataSetStr, len(ld["dataSet"].data), "d^{0} fit".format(round(ld["power"],2)), ld["equation"], round(ld["chi-squared"], 4), round(ld["p-value"], 4)])
             print(tb)
+
+        elif option in [131, 132]:
+            try:
+                alp = self.__promptForValue("Enter the significance level", 0.05)
+                group = self.groupBy("notes")
+                if len(group.data) != 2:
+                    raise Exception(1311)
+
+                r1 = group.data[0].flowRates
+                r2 = group.data[1].flowRates
+
+                if option == 131:
+                    s = cst.meanDiffInterval(r1, r2, alp, False)
+                elif option == 132:
+                    x_u = group.data[0].avgUncertaintyFlowRate()
+                    y_u = group.data[1].avgUncertaintyFlowRate()
+                    s = cst.meanDiffInterval(r1, r2, alp, False, x_u, y_u)
+
+                print("RESULT: The estimate mean difference is {0}, and the {1} %% confidence interval is ({2}, {3})".format(round(s[0],5), round((1-alp)*100, 1), round(s[1],5), round(s[2],5)))
+
+            except Exception(1311):
+                print("This data set is not valid for this operation.")
+
+
 
     @staticmethod
     def singlePloyFit(xd, yd, yerr, power, dgs=4):
@@ -502,7 +537,7 @@ class CplryDataSet:
                 apStr = str(round(k, dgs))
                 substrs.append(apStr)
             elif j == 1:
-                apStr = str(round(k, dgs)) + "x^" + str(power)
+                apStr = str(round(k, dgs)) + "x^" + str(round(power,2))
                 substrs.append(apStr)
         pStr = "y=" + "+".join(substrs)
 
@@ -573,8 +608,29 @@ def addOrSave():
     global passAddOrSave
     while True:
         try:
-            opt = input(
-                "-----Current Set Name: {0}-----\nChoose the following options: \n1 - Add new data\n2 - Print the current data set\n21 - Print the data set w./ group by tube diameter\n22 - Print the data set w./ group by tube length\n23 - Print the data set w./ group by height diff\n3 - Save the data set\n41 - Plot tube diameter vs flow rate\n42 - Plot [tube diameter]^4 vs flow rate\n43 - Plot tube diamter vs flow rate using semilogy() w./ power fits \n44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits\n51 - Plot tube length vs flow rate w./ inverse poly fit using uncertainty\n52 - Plot tube length vs flow rate w./ inverse poly fit using STD\n61 - Plot flow pressure vs flow rate w./ inverse poly fit using uncertainty \n101 - Plot with a subset\n121 - Find fit model about tube diameter vs flow rate with significance level\n9 - Switch to another data set\n0 - Exit the program \nYour choice: ".format(dataSet.name))
+            opt = input("""-----Current Set Name: {0}-----
+Choose the following options:
+1 - Add new data
+2 - Print the current data set
+21 - Print the data set w./ group by tube diameter
+22 - Print the data set w./ group by tube length
+23 - Print the data set w./ group by height diff
+24 - Print the data set w./ group by notes
+3 - Save the data set
+41 - Plot tube diameter vs flow rate
+42 - Plot [tube diameter]^4 vs flow rate
+3 - Plot tube diamter vs flow rate using semilogy() w./ power fits
+44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits
+51 - Plot tube length vs flow rate w./ inverse poly fit using uncertainty
+52 - Plot tube length vs flow rate w./ inverse poly fit using STD
+61 - Plot flow pressure vs flow rate w./ inverse poly fit using uncertainty
+101 - Plot with a subset
+121 - Find fit model about tube diameter vs flow rate with significance level
+131 - Find the confidence interval of the estimated mean between two setups w./ STD
+132 - Find the confidence interval of the estimated mean between two setups w./ uncertainties
+9 - Switch to another data set
+0 - Exit the program
+Your choice: """.format(dataSet.name))
             if opt == "1":
                 dataSet.add()
             elif opt == "2":
@@ -588,6 +644,9 @@ def addOrSave():
             elif opt == "23":
                 group = dataSet.groupBy("heightDiff")
                 group.view(4)
+            elif opt == "24":
+                group = dataSet.groupBy("notes")
+                group.view(5)
             elif opt == "3":
                 dataSet.save()
             elif 40 <= int(opt) <= 69:
