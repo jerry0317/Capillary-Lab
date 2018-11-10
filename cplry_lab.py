@@ -37,11 +37,18 @@ class CplryData(object):
     def flowPressure(self):
         return (997 * 9.8 * (self.heightDiff) / 100)
 
+    def effectivePressure(self):
+        return (self.flowPressure() + (997 * 9.8 * (self.tubeLength) * 2.54 / 100))
+
     def flowRate(self):
         return (self.flowVolumeDiff() / self.flowTime)
 
     def uncertaintyFlowRate(self):
         return (((self.uncertaintyInV / self.flowVolumeDiff()) + (self.uncertaintyInT / self.flowTime)) * self.flowRate())
+
+    def reynoldsNumber(self):
+        rsn = 4 * (self.flowRate()*10**(-6)) * (997) / (0.9775*10**(-3)*math.pi*(self.tubeDiameter*10**(-3)))
+        return rsn
 
 
 class CplrySingleGroupData(CplryData):
@@ -202,7 +209,7 @@ class CplryDataSet:
     def view(self, option=1):
         table = PrettyTable()
         if option == 1:
-            table.field_names = self.defaultFileHeader() + ["Flow Rate", "Uncertainty"]
+            table.field_names = self.defaultFileHeader() + ["Flow Rate", "Uncertainty", "Re"]
             for row in self.data:
                 table.add_row([
                     row.tubeLength,
@@ -215,7 +222,8 @@ class CplryDataSet:
                     round(row.uncertaintyInV, 3),
                     ("N/A" if str(row.notes) == "" else str(row.notes)),
                     round(row.flowRate(), 5),
-                    round(row.uncertaintyFlowRate(), 5)
+                    round(row.uncertaintyFlowRate(), 5),
+                    round(row.reynoldsNumber(), 3)
                 ])
         elif option == 2:
             table.field_names = ["Tube Diameter", "Avg Flow Rate", "Uncertainty", "STD"]
@@ -291,9 +299,9 @@ class CplryDataSet:
             lFitP = {}
             tb = PrettyTable()
             tb.field_names = ['Name', 'Poly Fit Equation', 'Chi-squared', 'p-value']
-            for i in [2, 3, 4, 5, (19/7)]:
+            for i in [4, (19/7)]:
                 lFitP[i], csq, eq, func = CplryDataSet.singlePloyFit(x_data, y_data, y_sigma, i, 4)
-                plt.plot(xp, func(xp, *lFitP[i]), '-', linewidth=1, label=r"$d^{0}$ fit".format(round(i,2)))
+                plt.plot(xp, func(xp, *lFitP[i]), '-', linewidth=1, label=r"$d^{{{0}}}$ fit".format(round(i,2)))
                 tb.add_row(["d^{0} fit".format(i), eq, str(round(csq[0], 5)), str(round(csq[1], 5))])
 
             print(tb)
@@ -321,36 +329,47 @@ class CplryDataSet:
             xp = np.linspace(min(x_data), max(x_data), 100)
             tb = PrettyTable()
             tb.field_names = ['Model Name', 'Fit Equation', 'Chi-squared', 'p-value']
-            for i in [-2, -1, -0.5]:
+            for i in [-1, -4/7]:
                 lFitP, csq, eq, func = CplryDataSet.singlePloyFit(x_data, y_data, y_sigma, i, 4)
-                plt.plot(xp, func(xp, *lFitP), '-', linewidth=1, label=r"l^{0} fit".format(i))
-                tb.add_row(["l^{0} fit".format(i), eq, str(round(csq[0], 5)), str(round(csq[1], 5))])
+                plt.plot(xp, func(xp, *lFitP), '-', linewidth=1, label=r"$l^{{{0}}}$ fit".format(round(i,2)))
+                tb.add_row(["l^{0} fit".format(round(i,2)), eq, str(round(csq[0], 5)), str(round(csq[1], 5))])
             print(tb)
             plt.legend(loc="upper left")
 
             plt.xlabel("Tube length (inch)")
             plt.ylabel("Flow Rate (cm^3/s)")
 
-        elif option == 61:
+        elif option in [61, 62, 63, 64]:
             group = self.groupBy("heightDiff")
-            x_data = group.listFromData("flowPressure")
-            y_data = group.listFromData("avgFlowRate")
-            y_error = group.listFromData("uErrorFlowRate")
-            plt.error(x_data, y_data, yerr=y_error, fmt="ko", markersize=4, elinewidth=1)
+            if option in [61, 62]:
+                x_data = [d / 1000 for d in group.listFromData("flowPressure")]
+            elif option in [63, 64]:
+                print("HEY")
+                x_data = [d / 1000 for d in group.listFromData("effectivePressure")]
 
-            y_sigma = group.listFromData("uncertaintyFlowRate")
+            y_data = group.listFromData("avgFlowRate")
+            x_error = 997 * 9.8 * (0.5) / (100 * 1000)
+            if option in [61, 63]:
+                y_error = group.listFromData("uErrorFlowRate")
+                y_sigma = group.listFromData("uncertaintyFlowRate")
+            elif option in [62, 64]:
+                y_error = group.listFromData("stdErrFlowRate")
+                y_sigma = group.listFromData("stdFlowRate")
+
+            plt.errorbar(x_data, y_data, xerr=x_error, yerr=y_error, fmt="ko", markersize=4, elinewidth=1)
+
             xp = np.linspace(min(x_data), max(x_data), 100)
             tb = PrettyTable()
             tb.field_names = ['Model Name', 'Fit Equation', 'Chi-squared', 'p-value']
-            for i in [0.5, 1, 2]:
+            for i in [1, 4/7]:
                 lFitP, csq, eq, func = CplryDataSet.singlePloyFit(x_data, y_data, y_sigma, i, 4)
-                plt.plot(xp, func(xp, *lFitP), '-', linewidth=1, label=r"l^{0} fit".format(i))
-                tb.add_row(["P^{0} fit".format(i), eq, str(round(csq[0], 5)), str(round(csq[1], 5))])
+                plt.plot(xp, func(xp, *lFitP), '-', linewidth=1, label=r"$l^{{{0}}}$ fit".format(round(i,2)))
+                tb.add_row(["P^{0} fit".format(round(i,2)), eq, str(round(csq[0], 5)), str(round(csq[1], 5))])
             print(tb)
 
             plt.legend(loc="upper left")
 
-            plt.xlabel("Pressure (Pa)")
+            plt.xlabel("Pressure (kPa)")
             plt.ylabel("Flow Rate (cm^3/s)")
 
         plt.show()
@@ -380,6 +399,8 @@ class CplryDataSet:
             dList = [d.tubeLength for d in self.data]
         elif option == "flowPressure":
             dList = [d.flowPressure() for d in self.data]
+        elif option == "effectivePressure":
+            dList = [d.effectivePressure() for d in self.data]
         elif option == "avgFlowRate":
             dList = [gd.avgFlowRate() for gd in self.data]
         elif option == "stdErrFlowRate":
@@ -410,21 +431,21 @@ class CplryDataSet:
             else:
                 return None
 
-        def assignGP(a, b):
-            if option == "tubeDiameter":
-                a.tubeDiameter = b
-            elif option == "tubeLength":
-                a.tubeLength = b
-            elif option == "heightDiff":
-                a.heightDiff = b
-            elif option == "notes":
-                a.notes = b
+        # def assignGP(a, b):
+        #     if option == "tubeDiameter":
+        #         a.tubeDiameter = b
+        #     elif option == "tubeLength":
+        #         a.tubeLength = b
+        #     elif option == "heightDiff":
+        #         a.heightDiff = b
+        #     elif option == "notes":
+        #         a.notes = b
 
         paraList = [gParameter(d) for d in tempData]
         paraSet = list(set(paraList))
         for p in paraSet:
             pData = CplrySingleGroupData()
-            assignGP(pData, p)
+            # assignGP(pData, p)
             pData.groupBy = option
             for d in tempData:
                 if (math.isclose(p, gParameter(d)) if type(gParameter(d)) != str else p == gParameter(d)) :
@@ -432,6 +453,10 @@ class CplryDataSet:
                     pData.flowTimes.append(d.flowTime)
                     pData.flowVolumeDiffs.append(d.flowVolumeDiff())
                     pData.uncertainties.append(d.uncertaintyFlowRate())
+                    pData.tubeDiameter = d.tubeDiameter
+                    pData.tubeLength = d.tubeLength
+                    pData.heightDiff = d.heightDiff
+                    pData.notes = d.notes
             groupSet.data.append(pData)
         groupSet.data.sort(key=lambda d: gParameter(d))
 
@@ -472,7 +497,7 @@ class CplryDataSet:
                     x_data = subGroupSet.listFromData("tubeDiameter")
                     y_data = subGroupSet.listFromData("avgFlowRate")
                     y_error = subGroupSet.listFromData("uncertaintyFlowRate")
-                    for i in [2, 3, 4, 5, (19/7)]:
+                    for i in [4, (19/7)]:
                         lFitP, csq, eq, _ = CplryDataSet.singlePloyFit(
                             x_data, y_data, y_error, i, 4)
 
@@ -526,10 +551,8 @@ class CplryDataSet:
             def func(x, a, b):
                 return a + b * x ** p
             return func
-        lFitP, _ = curve_fit(fitFunc(power), np.array(
-            xd), np.array(yd), sigma=yerr, absolute_sigma=True)
-        csq = cst.chisquare(obs=yd, exp=[fitFunc(power)(
-            xpt, *lFitP) for xpt in xd], std=yerr, ddof=2)
+        lFitP, _ = curve_fit(fitFunc(power), np.array(xd), np.array(yd), sigma=yerr, absolute_sigma=True)
+        csq = cst.chisquare(obs=yd, exp=[fitFunc(power)(xpt, *lFitP) for xpt in xd], std=yerr, ddof=2)
 
         substrs = []
         for j, k in enumerate(lFitP):
@@ -579,6 +602,7 @@ def openDataSet():
     for root, dirs, files in os.walk(csvPath):
         for filename in fnmatch.filter(files, "*.csv"):
             flsList.append(os.path.splitext(filename)[0])
+    flsList.sort()
     instrs = []
     for i in range(0, len(flsList)):
         substr = "{0} - {1}".format(i + 1, flsList[i])
@@ -619,11 +643,14 @@ Choose the following options:
 3 - Save the data set
 41 - Plot tube diameter vs flow rate
 42 - Plot [tube diameter]^4 vs flow rate
-3 - Plot tube diamter vs flow rate using semilogy() w./ power fits
+43 - Plot tube diamter vs flow rate using semilogy() w./ power fits
 44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits
 51 - Plot tube length vs flow rate w./ inverse poly fit using uncertainty
 52 - Plot tube length vs flow rate w./ inverse poly fit using STD
-61 - Plot flow pressure vs flow rate w./ inverse poly fit using uncertainty
+61 - Plot flow pressure vs flow rate w./ power fits using uncertainty
+62 - Plot flow pressure vs flow rate w./ power fits using STD
+63 - Plot flow pressure [effective] vs flow rate w./ power fits using uncertainty
+64 - Plot flow pressure [effective] vs flow rate w./ power fits using STD
 101 - Plot with a subset
 121 - Find fit model about tube diameter vs flow rate with significance level
 131 - Find the confidence interval of the estimated mean between two setups w./ STD
