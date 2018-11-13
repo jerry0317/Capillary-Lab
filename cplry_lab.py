@@ -35,10 +35,10 @@ class CplryData(object):
         return (self.tubeDiameter / 2)
 
     def flowPressure(self):
-        return (997 * 9.8 * (self.heightDiff) / 100)
+        return (997 * 9.8 * (self.heightDiff) / 100) # Pa
 
     def effectivePressure(self):
-        return (self.flowPressure() + (997 * 9.8 * (self.tubeLength) * 2.54 / 100))
+        return (self.flowPressure() + (997 * 9.8 * (self.tubeLength) * 2.54 / 100)) # Pa
 
     def flowRate(self):
         return (self.flowVolumeDiff() / self.flowTime)
@@ -89,6 +89,7 @@ class CplrySingleGroupData(CplryData):
 class CplryDataSet:
     name = "Untitled"
     data = []
+    __mu = 0.9775 * (10 ** (-3))
 
     def __init__(self, name="Untitled"):
         self.data = []
@@ -298,23 +299,30 @@ class CplryDataSet:
             xp = np.linspace(min(x_data), max(x_data), 100)
             lFitP = {}
             tb = PrettyTable()
-            tb.field_names = ['Name', 'Poly Fit Equation', 'Chi-squared', 'p-value']
+            tb.field_names = ['Name', 'Poly Fit Equation', 'Theoretical Coeff', 'Chi-squared', 'p-value']
             for i in [4, (19/7)]:
                 lFitP[i], csq, eq, func = CplryDataSet.singlePloyFit(x_data, y_data, y_sigma, i, 4)
                 plt.plot(xp, func(xp, *lFitP[i]), '-', linewidth=1, label=r"$d^{{{0}}}$ fit".format(round(i,2)))
-                tb.add_row(["d^{0} fit".format(i), eq, str(round(csq[0], 5)), str(round(csq[1], 5))])
+
+                effPressure = mean(group.listFromData("effectivePressure"))
+                tubeLen = mean(group.listFromData("tubeLength"))
+                vis = self.__mu
+
+                theoryCoeff = CplryDataSet.theoryCoeffForD(i, effP=effPressure, mu=vis, tubeL=tubeLen)
+
+                tb.add_row(["d^{0} fit".format(i), eq, str(round(theoryCoeff,5)), str(round(csq[0], 5)), str(round(csq[1], 5))])
 
             print(tb)
-            plt.legend(loc="upper right")
+            plt.legend(loc="upper left")
 
             plt.xlabel("Tube diameter (mm)")
-            plt.ylabel("Flow Rate (cm^3/s)")
+            plt.ylabel(r"Flow Rate (cm$^3$/s)")
             if option == 43:
                 plt.semilogy()
 
         elif option in [51, 52]:
             group = self.groupBy("tubeLength")
-            x_data = group.listFromData("tubeLength")
+            x_data = group.listFromData("tubeLengthCM")
             y_data = group.listFromData("avgFlowRate")
             if option == 51:
                 y_error = group.listFromData("uErrorFlowRate")
@@ -328,30 +336,39 @@ class CplryDataSet:
                 y_sigma = group.listFromData("stdFlowRate")
             xp = np.linspace(min(x_data), max(x_data), 100)
             tb = PrettyTable()
-            tb.field_names = ['Model Name', 'Fit Equation', 'Chi-squared', 'p-value']
+            tb.field_names = ['Model Name', 'Fit Equation', 'Theoretical Coeff x^0', 'Theoretical Coeff x^i', 'Chi-squared', 'p-value']
             for i in [-1, -4/7]:
                 lFitP, csq, eq, func = CplryDataSet.singlePloyFit(x_data, y_data, y_sigma, i, 4)
                 plt.plot(xp, func(xp, *lFitP), '-', linewidth=1, label=r"$l^{{{0}}}$ fit".format(round(i,2)))
-                tb.add_row(["l^{0} fit".format(round(i,2)), eq, str(round(csq[0], 5)), str(round(csq[1], 5))])
-            print(tb)
-            plt.legend(loc="upper left")
 
-            plt.xlabel("Tube length (inch)")
-            plt.ylabel("Flow Rate (cm^3/s)")
+                hPressure = mean(group.listFromData("flowPressure"))
+                tubeDiameter = mean(group.listFromData("tubeDiameter"))
+                vis = self.__mu
+
+                theoryCoeff = CplryDataSet.theoryCoeffForLCM(i, hP=hPressure, tubeD=tubeDiameter, mu=vis)
+
+                tb.add_row(["l^{0} fit".format(round(i,2)), eq, str(round(theoryCoeff[0],5)), str(round(theoryCoeff[1],5)), str(round(csq[0], 5)), str(round(csq[1], 5))])
+            print(tb)
+            plt.legend(loc="upper right")
+
+            plt.xlabel("Tube length (cm)")
+            plt.ylabel(r"Flow Rate (cm$^3$/s)")
 
         elif option in [61, 62, 63, 64]:
             group = self.groupBy("heightDiff")
             if option in [61, 62]:
                 x_data = [d / 1000 for d in group.listFromData("flowPressure")]
+                x_label = "Pressure (kPa)"
             elif option in [63, 64]:
-                print("HEY")
                 x_data = [d / 1000 for d in group.listFromData("effectivePressure")]
+                x_label = "Effective Pressure (kPa)"
 
             y_data = group.listFromData("avgFlowRate")
             x_error = 997 * 9.8 * (0.5) / (100 * 1000)
             if option in [61, 63]:
                 y_error = group.listFromData("uErrorFlowRate")
                 y_sigma = group.listFromData("uncertaintyFlowRate")
+
             elif option in [62, 64]:
                 y_error = group.listFromData("stdErrFlowRate")
                 y_sigma = group.listFromData("stdFlowRate")
@@ -360,17 +377,50 @@ class CplryDataSet:
 
             xp = np.linspace(min(x_data), max(x_data), 100)
             tb = PrettyTable()
-            tb.field_names = ['Model Name', 'Fit Equation', 'Chi-squared', 'p-value']
+            tb.field_names = ['Model Name', 'Fit Equation', 'Theoretical Coeff (P_eff)', 'Chi-squared', 'p-value']
             for i in [1, 4/7]:
                 lFitP, csq, eq, func = CplryDataSet.singlePloyFit(x_data, y_data, y_sigma, i, 4)
-                plt.plot(xp, func(xp, *lFitP), '-', linewidth=1, label=r"$l^{{{0}}}$ fit".format(round(i,2)))
-                tb.add_row(["P^{0} fit".format(round(i,2)), eq, str(round(csq[0], 5)), str(round(csq[1], 5))])
+                plt.plot(xp, func(xp, *lFitP), '-', linewidth=1, label=r"$P^{{{0}}}$ fit".format(round(i,2)))
+
+                tubeLength = mean(group.listFromData("tubeLength"))
+                tubeDiameter = mean(group.listFromData("tubeDiameter"))
+                vis = self.__mu
+
+
+                theoryCoeff = CplryDataSet.theoryCoeffForEffP(i, tubeD=tubeDiameter, tubeL=tubeLength, mu=vis)
+
+                tb.add_row(["P^{0} fit".format(round(i,2)), eq, str(round(theoryCoeff,5)), str(round(csq[0], 5)), str(round(csq[1], 5))])
             print(tb)
 
             plt.legend(loc="upper left")
 
-            plt.xlabel("Pressure (kPa)")
-            plt.ylabel("Flow Rate (cm^3/s)")
+            plt.xlabel(x_label)
+            plt.ylabel(r"Flow Rate (cm$^3$/s)")
+
+        elif option in [45, 46]:
+            group = self.groupBy("tubeDiameter")
+            x_data = group.listFromData("tubeDiameter")
+            y_data = group.listFromData("avgFlowRate")
+            y_error = group.listFromData("uErrorFlowRate")
+            plt.errorbar(x_data, y_data, yerr=y_error, fmt='ko', markersize=4, elinewidth=1)
+
+            calList = self.calculate(121, True)
+
+            i = 1
+            for c in calList:
+                gx = c["dataSet"].listFromData("tubeDiameter")
+                gxp = np.linspace(min(gx), max(gx), 100)
+                glFitP = c["fitModel"]
+                gFunc = c["fitFunc"]
+                plt.plot(gxp, gFunc(gxp, *glFitP), '-', linewidth=1, label=r"$L_{0}$".format(i))
+                i += 1
+
+            plt.legend(loc="upper left")
+
+            plt.xlabel("Tube diameter (mm)")
+            plt.ylabel(r"Flow Rate (cm$^3$/s)")
+            if option == 45:
+                plt.semilogy()
 
         plt.show()
 
@@ -397,6 +447,8 @@ class CplryDataSet:
             dList = [(d.tubeDiameter ** 4) for d in self.data]
         elif option == "tubeLength":
             dList = [d.tubeLength for d in self.data]
+        elif option == "tubeLengthCM":
+            dList = [d.tubeLength * 2.54 for d in self.data]
         elif option == "flowPressure":
             dList = [d.flowPressure() for d in self.data]
         elif option == "effectivePressure":
@@ -408,8 +460,7 @@ class CplryDataSet:
         elif option == "uncertaintyFlowRate":
             dList = [gd.avgUncertaintyFlowRate() for gd in self.data]
         elif option == "uErrorFlowRate":
-            dList = [gd.avgUncertaintyFlowRate() / math.sqrt(gd.length())
-                     for gd in self.data]
+            dList = [gd.avgUncertaintyFlowRate() / math.sqrt(gd.length()) for gd in self.data]
         elif option == "stdFlowRate":
             dList = [gd.std() for gd in self.data]
         return dList
@@ -430,16 +481,6 @@ class CplryDataSet:
                 return dt.notes
             else:
                 return None
-
-        # def assignGP(a, b):
-        #     if option == "tubeDiameter":
-        #         a.tubeDiameter = b
-        #     elif option == "tubeLength":
-        #         a.tubeLength = b
-        #     elif option == "heightDiff":
-        #         a.heightDiff = b
-        #     elif option == "notes":
-        #         a.notes = b
 
         paraList = [gParameter(d) for d in tempData]
         paraSet = list(set(paraList))
@@ -462,7 +503,7 @@ class CplryDataSet:
 
         return groupSet
 
-    def calculate(self, option):
+    def calculate(self, option, ret=False):
         if option == 121:
             while True:
                 try:
@@ -476,8 +517,7 @@ class CplryDataSet:
                         raise Exception(3)
                     break
                 except Exception(3):
-                    print(
-                        "Significance level must be between 0 and 1. Please try again.")
+                    print("Significance level must be between 0 and 1. Please try again.")
                 else:
                     traceback.print_exc()
 
@@ -498,28 +538,35 @@ class CplryDataSet:
                     y_data = subGroupSet.listFromData("avgFlowRate")
                     y_error = subGroupSet.listFromData("uncertaintyFlowRate")
                     for i in [4, (19/7)]:
-                        lFitP, csq, eq, _ = CplryDataSet.singlePloyFit(
-                            x_data, y_data, y_error, i, 4)
+                        lFitP, csq, eq, fitFunc = CplryDataSet.singlePloyFit(x_data, y_data, y_error, i, 4)
+                        effPressure = mean(subGroupSet.listFromData("effectivePressure"))
+                        tubeLen = mean(subGroupSet.listFromData("tubeLength"))
+                        vis = self.__mu
+
+                        theoryCoeff = CplryDataSet.theoryCoeffForD(i, effP=effPressure, mu=vis, tubeL=tubeLen)
 
                         if csq[1] >= sigL:
                             vData = {
                                 "dataSet": subGroupSet,
                                 "power": i,
                                 "fitModel": lFitP,
+                                "fitFunc": fitFunc,
                                 "csq": csq,
                                 "equation": eq,
                                 "chi-squared": csq[0],
-                                "p-value": csq[1]
+                                "p-value": csq[1],
+                                "theoryCoeff": theoryCoeff
                             }
                             validList.append(vData)
 
             tb = PrettyTable()
-            tb.field_names = ["Data Set", "Data Length",
-                              "Model Type", "Fit Equation", "Chi-sqaured", "p-value"]
+            tb.field_names = ["Data Set", "Data Length", "Model Type", "Fit Equation", "Theoretical Coeff", "Chi-sqaured", "p-value"]
             for ld in validList:
                 dataSetStr = ", ".join([str(round(d.tubeDiameter, 4)) + "mm" for d in ld["dataSet"].data])
-                tb.add_row([dataSetStr, len(ld["dataSet"].data), "d^{0} fit".format(round(ld["power"],2)), ld["equation"], round(ld["chi-squared"], 4), round(ld["p-value"], 4)])
+                tb.add_row([dataSetStr, len(ld["dataSet"].data), "d^{0} fit".format(round(ld["power"],2)), ld["equation"], round(ld["theoryCoeff"], 5), round(ld["chi-squared"], 4), round(ld["p-value"], 4)])
             print(tb)
+            if ret == True:
+                return validList
 
         elif option in [131, 132]:
             try:
@@ -565,6 +612,33 @@ class CplryDataSet:
         pStr = "y=" + "+".join(substrs)
 
         return lFitP, csq, pStr, fitFunc(power)
+
+    @staticmethod
+    def theoryCoeffForD(i, effP, tubeL, mu):
+        if i == 4: # Laminar model
+            tC = effP * math.pi / (128 * mu * tubeL * 2.54 / 100) * (10 ** (-6))
+        elif math.isclose(i, 19/7): # Approx turbulent model
+            tC = 2.255 * math.pow(effP, 4/7) / (math.pow(997, 3/7) * math.pow(mu, 1/7) * math.pow(tubeL * 2.54 / 100, 4/7)) * math.pow(10, -15/7)
+        return tC
+
+    @staticmethod
+    def theoryCoeffForLCM(i, hP, tubeD, mu):
+        if i == -1: # Laminar model
+            tC1 = hP * math.pi * math.pow(tubeD/1000, 4) / (128 * mu) * (10 ** 8)
+            tC0 = 997 * 9.8 * math.pi * math.pow(tubeD/1000, 4) / (128 * mu) * (10 ** 6)
+        elif math.isclose(i, -4/7): # Approx turbulent model [HORIZONTAL ONLY]
+            tC1 = 2.255 * math.pow(hP, 4/7) * math.pow(tubeD/1000, 19/7) / (math.pow(997, 3/7) * math.pow(mu, 1/7)) * math.pow(10, 50/7)
+            tC0 = 0
+        return [tC0, tC1]
+
+    @staticmethod
+    def theoryCoeffForEffP(i, tubeD, tubeL, mu, scale=1000):
+        if i == 1: # Laminar model
+            tC = math.pi * math.pow(tubeD/1000, 4) / ((128 * mu) * (tubeL * 2.54 / 100)) * (10 ** 6) * scale
+        elif math.isclose(i, 4/7): # Approx turbulent model
+            tC = 2.255 * math.pow(tubeD/1000, 19/7) / (math.pow(997, 3/7) * math.pow(mu, 1/7) * math.pow(tubeL * 2.54 / 100, 4/7)) * (10 ** 6) * math.pow(scale, 4/7)
+        return tC
+
 
 
 def initiate():
@@ -645,6 +719,8 @@ Choose the following options:
 42 - Plot [tube diameter]^4 vs flow rate
 43 - Plot tube diamter vs flow rate using semilogy() w./ power fits
 44 - Plot tube diamter vs flow rate (Regular plot) w./ power fits
+45 - Use 121 & plot tube diamter vs flow rate using semilogy() w./ power fits
+46 - Use 121 & plot tube diamter vs flow rate (Regular plot) w./ power fits
 51 - Plot tube length vs flow rate w./ inverse poly fit using uncertainty
 52 - Plot tube length vs flow rate w./ inverse poly fit using STD
 61 - Plot flow pressure vs flow rate w./ power fits using uncertainty
