@@ -269,7 +269,7 @@ class CplryDataSet:
     def plot(self, option):
         fig = plt.figure(option)
         ax = fig.add_subplot(111)
-        ax.tick_params(axis="both", direction="in")
+        ax.tick_params(axis="both",which="both", direction="in")
         if option == 41:
             group = self.groupBy("tubeDiameter")
             x_data = group.listFromData("tubeDiameter")
